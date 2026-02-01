@@ -34,7 +34,7 @@ export default class ItemDialog {
         
         let item=this.item;  
         
-        if (!item.system?.innate){
+        if (!item.system?.innate && item.type!='action'){
         
         let content=`<p><strong>${this.item.name}</strong> ${gb.trans('NoSkillQuestion')}</p>`;
         content+=`<p><select id="skillitem">`;
@@ -100,6 +100,7 @@ export default class ItemDialog {
         let showRaiseDmg=true;
         let char=new Char(this.actor)
         let powermod=''
+        let hasDefaultDamage=true;
         
         let damageActions=[];
       //  let showReload=false;
@@ -117,7 +118,12 @@ export default class ItemDialog {
             
         }
 
-        
+        if (item.type=='shield' || item.type=='action'){
+            showDamage=false;
+            hasDefaultDamage=false;
+        }
+
+       
 
         for (const id in weaponactions.additional){
             if (weaponactions.additional[id].type=='damage'){
@@ -157,19 +163,19 @@ export default class ItemDialog {
                 content+=`<div><strong>${gb.trans('Item.power','TYPES')} ${gb.trans('Modifier')}</strong>: ${powermod} (${gb.realInt(weaponinfo.pp)} ${gb.trans('PPAbbreviation','SWADE')})</div>`
 
             } else {
-                content+=`<div><strong>${gb.trans('PPCost','SWADE')}</strong>: ${gb.realInt(weaponinfo.pp)}/${gb.realInt(char.getActualPP(item.system.arcane))}</div>`
+                content+=`<div><strong>${gb.trans('PPCost','SWADE')}</strong>: <span class="swadetools-powercost">${gb.getPPCostMod(item)}</span>/${gb.realInt(char.getActualPP(item.system.arcane))}</div>`
             }
             
             
 
-            content+=`<div><strong>${gb.trans('Dur','SWADE')}</strong>: ${weaponinfo.duration}</div>
-            <div><strong>${gb.trans('Range._name','SWADE')}</strong>: ${weaponinfo.range}</div>
-        `
+            content+=`<div><strong>${gb.trans('Range._name','SWADE')}</strong>: ${weaponinfo.range}</div>
+            <div><strong>${gb.trans('Dur','SWADE')}</strong>: ${weaponinfo.duration}</div>
+            `
         }
        
         content+=`</div>`
 
-        if (item.type=='power'){
+        if (item.type=='power' || item.type=='weapon'){
             let templatehtml=gb.getTemplatesHTML(item);
             if (templatehtml){
                 content+=`<span class="swade-tools-template-buttons"><strong>Templates:</strong>${templatehtml}</span>`
@@ -250,9 +256,13 @@ export default class ItemDialog {
 
         
 
-        if (damageActions.length>0){
-            content+=`<div class="swadetools-damage-actions swadetools-mod-add"><label><strong>${gb.trans('Damage')}:</strong> <i class="far fa-question-circle swadetools-hint" title="${gb.trans('ActDmgHint')}"></i></label> <select id="actiondmg">
-            <option value="">${gb.trans('Default')}</option>`;
+        if ((hasDefaultDamage && damageActions.length>0) || (!hasDefaultDamage && damageActions.length>1)){
+            content+=`<div class="swadetools-damage-actions swadetools-mod-add"><label><strong>${gb.trans('Damage')}:</strong> <i class="far fa-question-circle swadetools-hint" title="${gb.trans('ActDmgHint')}"></i></label> <select id="actiondmg">`;
+
+            if (hasDefaultDamage){
+                content+=`<option value="">${gb.trans('Default')}</option>`;
+            }
+            
 
           //  console.log(damageActions)
          
@@ -271,7 +281,38 @@ export default class ItemDialog {
         }
 
 
+        gb.log(item.effects,item.type);
+
+        /// ==> START POWER MODIFIERS
+
+        if (item.type=='power'){
+
+            const modifiers = item.effects.filter(e => e.type === "modifier");
+
+            if (modifiers){
+
+            content+=`<div class="swadetools-damage-actions swadetools-mod-add swadetools-mid-title"><h3>${gb.trans('PPMods','SWADE')}</h3></div>`; 
+            
+            content+=`<div class="swadetools-power-modifiers">`;
+
+            for (const e of modifiers) {
+            content += `
+                <label>
+                <input type="checkbox" class="swadetools-powermod-check" ${e.disabled ? "" : "checked"} data-id="${e.id}">
+                ${e.name}
+                </label>
+            `;
+            }   
+
+            content+='</div>';
+
+            }
+
+        }
         
+
+        /// ==> END POWER MODIFIERS
+
 
         if ( gb.setting('selectModifiers') || gb.setting('askCalledShots')){
         content+=`<div class="swadetools-damage-actions swadetools-mod-add swadetools-mid-title"><h3>${gb.trans("ModOther",'SWADE')}</h3></div>`;
@@ -395,7 +436,7 @@ export default class ItemDialog {
        
         if (!skillName){
 
-            if (skillflag!==true){
+            if (skillflag!==true && this.item.type!='action'){
                 skillName=this.noSkillItem();
             } else {
                 noMainSkill=true;
@@ -405,6 +446,7 @@ export default class ItemDialog {
            // skillName=gb.trans('Unskilled');
         }
 
+        
        
            
            // skillName=gb.trans('Unskilled');
@@ -417,6 +459,7 @@ export default class ItemDialog {
         let damageIcon='<i class="fas fa-tint"></i> ';
         let resistIcon='<i class="fas fa-shield"></i> ';
         let genericIcon='<i class="fas fa-circle"></i> '
+        let macroIcon='<i class="fas fa-robot"></i> ';
         
 
         if (!noMainSkill){  //// hide button for main skill if there's no skill
@@ -588,16 +631,20 @@ export default class ItemDialog {
             let action=weaponactions.additional[id];
 
             let actionIcon;
-            if (action.type=='skill'){
+            if (action.type=='trait'){
                 actionIcon=skillIcon;
             } else if (action.type=='damage'){
                 actionIcon=damageIcon;
             }else if (action.type=='resist'){
                 actionIcon=resistIcon;
-            } else {
+            } else if (action.type=='macro'){
+                actionIcon=macroIcon
+            }else {
                 actionIcon=genericIcon
             }
        
+
+
 
            /// go to RollControl
                 buttons[id]={
@@ -606,9 +653,11 @@ export default class ItemDialog {
 
                         if (action.type=='resist'){ 
 
-                            gb.rollResist(action.skillOverride,action.skillMod);
+                            gb.rollResist(action.skillOverride,action.traitMod);
                         
-                        } else  {
+                        } else if (action.type=='macro'){                            
+                            game.swade.itemChatCardHelper.handleAdditionalActions(this.item,this.actor,id) /// swade system handles macros
+                        }else  {
                             let itemRoll=new ItemRoll(this.actor,this.item)
                             await this.processItemFormDialog(html,itemRoll,action.type);
                             await itemRoll.rollAction(id);
@@ -641,6 +690,27 @@ export default class ItemDialog {
                     
                    
                 })
+
+                html.on('click','.swadetools-powermod-check', async ev => {
+                   
+      const id = ev.target.dataset.id;
+      const enabled = ev.target.checked;
+
+       gb.log(ev,id,enabled);
+
+      const effect = item.effects.get(id);
+      if(!effect) return;
+
+      await effect.update({ disabled: !enabled });
+
+      const cost = effect.system.cost ?? 0;
+
+    // span com valor original
+    html.find("span.swadetools-powercost").text(gb.getPPCostMod(item));
+   // const baseCost = Number(span.data("basecost"));
+
+
+    });
                 
             }
         },{classes:['dialog swadetools-vertical']}).render(true);

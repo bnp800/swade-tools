@@ -11,7 +11,7 @@ export default class SystemRoll {
 
    async rollDamage(itemId){
       //  this.addJokerModifier(); 
-      await   Hooks.once("renderChatMessage", (chat, html,data) => { 
+      await   Hooks.once("renderChatMessageHTML", (chat, html,data) => { 
         if (data.user.id==game.user.id){
         chat.update({'flags.swade-tools.rolltype':'damage'});
         }
@@ -38,6 +38,7 @@ export default class SystemRoll {
             let item=this.actor.items.get(skillId);
 
             
+            
 
             let skillName;
             let exp;
@@ -46,7 +47,7 @@ export default class SystemRoll {
                 exp=`d4-2`
             } else {
                 skillName=item.name;
-                let skillModifier=gb.realInt(gb.skillModifier(item));
+                let skillModifier=item.system.die.modifier;
                 exp=`d${item.system.die.sides}${skillModifier?'+'+skillModifier:''}`
             }
             
@@ -101,7 +102,7 @@ export default class SystemRoll {
 
         } else {
          //   this.addJokerModifier();  
-         await Hooks.once("renderChatMessage", (chat, html,data) => { 
+         await Hooks.once("renderChatMessageHTML", (chat, html,data) => { 
            // console.log(data);
             if (data.user.id==game.user.id){
             chat.update({'flags.swade-tools.rolltype':'skill'});
@@ -138,7 +139,7 @@ export default class SystemRoll {
     async rollRun(){
         if (gb.setting('simpleRolls')){
             let content=`<div class="swadetools-itemfulldata">
-                    <strong>${gb.trans('Running','SWADE')}</strong>: ${this.actor.system.stats.speed.adjusted}+d${this.actor.system.stats.speed.runningDie}${gb.stringMod(this.actor.system.stats.speed.runningMod)}
+                    <strong>${gb.trans('Running','SWADE')}</strong>: ${this.actor.system.pace.ground}+d${this.actor.system.pace.running.die}${gb.stringMod(this.actor.system.pace.running.mod)}
                     </div>
                     <div class="swadetools-formpart"><div class="swadetools-mod-add"><label><strong>${gb.trans('Modifier')}</strong> <i class="far fa-question-circle swadetools-hint" title="${gb.trans('ModHint')}"></i></label></label><input type="text" class="swadetools-input-number" id="mod" value=""></div></div>`
                     new Dialog({
@@ -186,7 +187,7 @@ export default class SystemRoll {
 
         if (gb.setting('simpleRolls')){
 
-            let attModifier=gb.realInt(gb.attModifier(this.actor,attribute));
+            let attModifier=gb.realInt(this.actor.system.attributes[attribute].die.modifier);
 
             let content=`<div class="swadetools-itemfulldata">
                     <strong>${gb.trans(gb.attrlang[attribute],'SWADE')}</strong>: d${this.actor.system.attributes[attribute].die.sides}${attModifier?'+'+attModifier:''}
@@ -233,7 +234,7 @@ export default class SystemRoll {
     
          //   console.log('called');
            // this.addJokerModifier();   
-           await Hooks.once("renderChatMessage", (chat, html,data) => { 
+           await Hooks.once("renderChatMessageHTML", (chat, html,data) => { 
             if (data.user.id==game.user.id){
             chat.update({'flags.swade-tools.rolltype':'attribute'});
             }

@@ -48,6 +48,15 @@ var foundryIsReady=false;
 
 Hooks.on('ready',async()=>{
 
+
+    /// only socket to fix permission for gb.setFlagCombatant (remove it => or rework)
+    /* game.socket.on('module.'+gb.moduleName,async(data)=>{
+        if (game.user.id != gb.GMPlayer().id) return;
+        gb.log(data);
+       await game.combats.get(data.combat._id).setFlag(data.scope,data.flag+'###'+data.combatant._id,data.value);       
+        
+    }) */
+
    
     game.swadetools={};
     game.swadetools=st;
@@ -132,6 +141,7 @@ Hooks.on('ready',async()=>{
 
         if (!gb.setting('defaultStatusIcons')){
            data.icon=gb.stIcons.filter(el=>el.stat==gb.statusDefaultToIs(data.id))[0]?.icon;
+           data.img=gb.stIcons.filter(el=>el.stat==gb.statusDefaultToIs(data.id))[0]?.icon;
         }
 
            if (data?.flags?.swade?.expiration){ /// disable dialog -> enable for no-autoRoll in the future ????
@@ -140,6 +150,20 @@ Hooks.on('ready',async()=>{
            
        }
    })
+
+   CONFIG.statusEffects.push({
+    img: 'modules/swade-tools/icons/w1.png',
+    id: 'woundst',
+    _id: gb.wounds_id,
+    name: 'SWADE.Wound',
+    })
+
+    CONFIG.statusEffects.push({
+        img: 'modules/swade-tools/icons/f1.png',
+        id: 'fatiguest',
+        _id: gb.fatigues_id,
+        name: 'SWADE.Fatigue',
+        })
 
    /// remove swade dialogs
    if (gb.setting('noStatusAutoRoll')!='all'){
@@ -198,47 +222,12 @@ Hooks.on("createActor",(actor,options,userid)=>{
 })
 
 
-/* Hooks.on("createActiveEffect", (effect, diff,userid) => { 
-    
-   // console.log(plus,'ae-data-create');
-    
-   // console.log(effect);
-   
-    if (game.user.id==userid && effect.flags?.core?.statusId){
-        let actor=effect.parent; 
-        let upActor=new StatusIcon(actor,'actor');
-        upActor.chainedStatus(effect.flags.core.statusId,true)
 
-       //  let act=new SwadeActiveEffect();
-      //  act.apply(actor,'shaken'); 
-      //  char.activeEffect(effect.data.flags.core.statusId,false);
-    }
-    
-
-    
-
-   
-})
-
-Hooks.on("deleteActiveEffect", (effect,diff,userid)=>{
-
-    
-
-    if (game.user.id==userid && effect.flags?.core?.statusId){
-        let actor=effect.parent; 
-        let upActor=new StatusIcon(actor,'actor');
-        upActor.chainedStatus(effect.flags.core.statusId,false)
-      //  char.activeEffect(effect.data.flags.core.statusId,false);
-    }
-})
- */
-
-
-///data-swade-tools-action='func:arg1,arg2'
-
-Hooks.on("renderChatMessage", async (chatItem, html) => { 
+Hooks.on("renderChatMessageHTML", async (chatItem, element) => { 
 
    // console.log(chatItem);
+
+   const html = $(element);
     
     html.on('click','a[data-swade-tools-action],button[data-swade-tools-action]',(event)=>{ /// remove and change for Hooks.once ?
         let el=event.currentTarget;
@@ -246,15 +235,10 @@ Hooks.on("renderChatMessage", async (chatItem, html) => {
             let func=data[0];
             let args=data[1].split(',')
 
-            //  console.log(func);
-             // el.addEventListener('click',()=>{
+         
                   gb.btnAction[func](args);
 
-                 /*  if (el.getAttribute('data-swade-tools-action-once')){
-                      $(el).unbind('click').attr('disabled','disabled').removeAttr('data-swade-tools-action');
-
-                  } */
-            //  })
+                
 
     })
 
@@ -262,67 +246,18 @@ Hooks.on("renderChatMessage", async (chatItem, html) => {
         let el=$(event.currentTarget);
         el.closest('.swadetools-pseudocard').find('.card-content').toggle();
     })
-   //console.log(chatItem)
+  
 
-  //  console.log();
+   
 
     if (foundryIsReady && chatItem.isRoll){
 
-     //   console.log(chatItem.data.user);
+  
 
-    
-     //console.log(chatItem);
-
-        let roll=new RollControl(chatItem,html,chatItem.user);
+        let roll=new RollControl(chatItem,html,chatItem.author);
        
         await roll.doActions();
 
-     /*    let dices=chatItem._roll.dice;
-
-
-        if (chatItem.data.flags["swade-tools"]?.itemroll){
-            html.append('Here it is');
-        }
-
-
-        if (dices!==undefined){
-        let ones=dices.filter(el=>el.total==1);
-
-     //   console.log(ones);
-        
-        if (ones.length>1 && ones.length>(dices.length/2)){
-            html.append('<div class="swadetools-criticalfailure">'+gb.trans('CriticalFailure')+'</div>')
-        } else {
-        html.append('<a class="swadetools-bennyrerroll" title="'+gb.trans('RerollBtn')+'"><i class="fas fa-sync"></i></a>').on('click','a',()=>{
-            let actor=game.actors.filter(el=>el.name==chatItem.alias)[0];
-            if (!actor || actor.length>1){
-                return ui.notifications.warn('NoActorFoundRerroll')
-            }
-
-            let char=new Char(actor);
-            
-         //   console.log(actor);
-
-            if (char.spendBenny()){
-
-            let roll=new Roll(chatItem._roll.formula).roll();
-
-            
-
-            let chatData = {
-                user: game.user._id,
-                speaker: {alias:chatItem.alias},
-             //content: 'this is plus',
-            flavor: chatItem.data.flavor
-            };
-    
-    
-           roll.toMessage(chatData);
-            }
-        
-        });
-    }
-    } */
 
     }
    
@@ -378,14 +313,14 @@ Hooks.on("updateActiveEffect", async (effect,info,diff,userId) => {
 
 })
 
-Hooks.on("createToken",(token,diff,userId)=>{
+/* Hooks.on("createToken",(token,diff,userId)=>{
    // console.log(token,diff,userId);
     if (game.user.id==userId){
     let upToken=new StatusIcon(token,'token',false);
     upToken.createTokenCheck();
     }
    
-})
+}) */
 
 Hooks.on('updateToken', async (scene, token, data, options, userId) => {
     if (game.user.id==userId){
@@ -440,13 +375,13 @@ Hooks.on('ready',()=>{ /// disable autoInit
 
     }  */
 
-    if (gb.systemSettingExists('parryBaseSkill')){
-        if (gb.systemSetting('parryBaseSkill')!=gb.setting('fightingSkill')){
-            game.settings.set('swade','parryBaseSkill',gb.setting('fightingSkill')) /// auto-translate
-            ui.notifications.info(gb.trans('ParryBase','SWADE')+' '+gb.trans('FightingWarn')+' '+gb.setting('fightingSkill'))
+    /* if (gb.systemSettingExists('parryBaseSwid')){
+        if (gb.systemSetting('parryBaseSwid')!=gb.trans('fightingSkillSWID')){
+            game.settings.set('swade','parryBaseSwid',gb.setting('fightingSkillSWID')) /// auto-translate
+            ui.notifications.info(gb.trans('ParryBase.Name','SWADE')+' '+gb.trans('FightingWarn')+' '+gb.setting('fightingSkillSWID'))
         }
         
-    }
+    } */
 
 
     /// disabled -> swade already doing it.
@@ -475,81 +410,151 @@ Hooks.on('ready',()=>{ /// disable autoInit
 //var dontStart=false;
 let cbt=new CombatControl;
 
-Hooks.on('updateCombat',async (entity,data,options,userid)=>{
-  //  console.log(JSON.parse(JSON.stringify(entity)))
-  //console.log(entity);
+/* Hooks.on('combatTurn'),  (combat,data,data2)=>{
+    console.log(combat,data,data2);
+    return true;
+} */
 
-    gb.log('SWADETOOLS','A',gb.mainGM(),foundryIsReady);
-    if (foundryIsReady && gb.mainGM()){
+
+
+Hooks.on('combatTurn', async (combat,data,options) => 
+{
+    if (options.direction == -1) return;  //EternalRider: Do not retrigger
+   // console.log(JSON.parse(JSON.stringify(data.turn)));
     
-    let combatdata=entity;
-    let combatid=combatdata.id;
-    cbt.setCombat(combatid);  
+    // cbt.setCombat(combat.id); //EternalRider: useless
+   // const currentCombatant=await combat.current.combatantId;
+    await cbt.endTurn(combat.turns[data.turn - 1]);  //EternalRider: with no backforward, just use minus 1
+
+    await cbt.startTurn(combat.turns[data.turn]);
+
     
-    gb.log('SWADETOOLS','B',combatid);
+   
+   // 
+   //  console.log(combat,data);
+})
+
+Hooks.on('combatRound',async (combat,data,options) => {
+    if (options.direction == -1) return;  //EternalRider: Do not retrigger
+    // cbt.setCombat(combat.id); //EternalRider: useless
+    // const currentCombatant=await combat.current.combatantId;
+
+    /* EternalRider: hooks will not be called in right times, so we need to wait for all combatants to have their initiative set
+    let helpHook=Hooks.on('updateCombat', async(combatdata)=>{
+
+        let itgo=true;
+        combatdata.turns.map(turner=>{
+            if (turner.initiative===null){
+                itgo=false;
+            }
+        })
+
+        if (itgo){
+            await cbt.endTurn();
+            await cbt.startTurn(combat.turns[0]);
+            Hooks.off('updateCombat',helpHook)
+        }
+   
+    })*/
     
-    /// COMBAT SYNC ERROR 
-    /* if (combatdata.current.round!=combatdata.previous.round){
+    //EternalRider: store this before it has been changed
+    let previous = combat.combatants.get(combat?.previous?.combatantId);
+    //EternalRider: clean up retrigger tag when new round starts
+    for (let turner of combat.turns) {
+        await cbt.setFlag(turner, gb.moduleName, 'hasStarted', false);
+        await cbt.setFlag(turner, gb.moduleName, 'hasEnded', false);
+       //await turner.setFlag(gb.moduleName,'hasStarted',false);
+      // await turner.setFlag(gb.moduleName,'hasEnded',false);
+    }
+    //EternalRider: wait for all combatants to have their initiative set
+    await gb.waitFor(() => {
+        return combat.turns.every(turner => turner.initiative !== null);
+    }, -1);
+    //EternalRider: then trigger the end and start turn
+    await cbt.endTurn(previous);
+    await cbt.startTurn(combat.turns[0]);
+})
+
+//EternalRider: don't forget to start the first turn
+Hooks.on("combatStart", async (combat, data) => {
+    await cbt.startTurn(combat.turns[data.turn]);
+});
+
+// Hooks.on('updateCombat',async (entity,data,options,userid)=>{
+//   //  console.log(JSON.parse(JSON.stringify(entity)))
+//   //console.log(entity);
+
+//     gb.log('SWADETOOLS','A',gb.mainGM(),foundryIsReady);
+//     if (foundryIsReady && gb.mainGM()){
+    
+//     let combatdata=entity;
+//     let combatid=combatdata.id;
+//     cbt.setCombat(combatid);  
+    
+//     gb.log('SWADETOOLS','B',combatid,combatdata);
+    
+//     /// COMBAT SYNC ERROR 
+//     /* if (combatdata.current.round!=combatdata.previous.round){
       
 
-       await cbt.endTurn(combatdata.combatants.find(el=>el.id==combatdata.previous.combatantId));
-       let init=0;
-       let first=false;
-       let csize=combatdata.combatants.size;
-       let i=0;
-       let combatantsids=new Array;
-       let suit=0;
+//        await cbt.endTurn(combatdata.combatants.find(el=>el.id==combatdata.previous.combatantId));
+//        let init=0;
+//        let first=false;
+//        let csize=combatdata.combatants.size;
+//        let i=0;
+//        let combatantsids=new Array;
+//        let suit=0;
     
 
-       let firstPlayer=Hooks.on('updateCombatant',async(combatant,initdata)=>{
+//        let firstPlayer=Hooks.on('updateCombatant',async(combatant,initdata)=>{
        
            
-            if (initdata.initiative!==null){
-                if (!combatantsids.includes(combatant.id)){
-                    combatantsids.push(combatant.id);
-                    i++;
+//             if (initdata.initiative!==null){
+//                 if (!combatantsids.includes(combatant.id)){
+//                     combatantsids.push(combatant.id);
+//                     i++;
 
-                    if (initdata.flags.swade.cardValue>init ||
-                        initdata.flags.swade.cardValue==init && initdata.flags.swade.suitValue>suit
-                        ){                   
-                        first=combatant.id;
-                        init=initdata.flags.swade.cardValue;
-                        suit=initdata.flags.swade.suitValue;
-                    }
+//                     if (initdata.flags.swade.cardValue>init ||
+//                         initdata.flags.swade.cardValue==init && initdata.flags.swade.suitValue>suit
+//                         ){                   
+//                         first=combatant.id;
+//                         init=initdata.flags.swade.cardValue;
+//                         suit=initdata.flags.swade.suitValue;
+//                     }
     
-                    if (i==csize){
-                        Hooks.off('updateCombatant',firstPlayer);
-                        await cbt.startTurn(combatdata.combatants.find(el=>el.id==first));
-                    }
-                }
+//                     if (i==csize){
+//                         Hooks.off('updateCombatant',firstPlayer);
+//                         await cbt.startTurn(combatdata.combatants.find(el=>el.id==first));
+//                     }
+//                 }
                 
                 
              
               
-            }
+//             }
 
            
-       })
+//        })
 
        
         
-    } else { */
+//     } else { */
 
-        if (cbt.isNewTurn()){
-            gb.log('SWADETOOLS','C');
-        await cbt.endTurn();
-        await cbt.startTurn(combatdata.combatants.find(el=>el.id==combatdata.current.combatantId));
+//         if (cbt.isNewTurn()){
+//             gb.log('SWADETOOLS','C');
+//         await cbt.endTurn();
+//         await cbt.startTurn(combatdata.combatants.find(el=>el.id==combatdata.current.combatantId));
 
-        gb.log('SWADETOOLS','D');
-        } /* else {
-          //  await cbt.endPrevious();
-            gb.log('not a new turn')
-        } */
-    /* } */
+//         gb.log('SWADETOOLS','D');
+//         } /* else {
+//           //  await cbt.endPrevious();
+//             gb.log('not a new turn')
+//         } */
+//     /* } */
    
     
-    }
-});
+//     }
+// });
 
 
 

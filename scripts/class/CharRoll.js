@@ -65,7 +65,10 @@ export default class CharRoll extends BasicRoll{
      //   console.log(mod,reason);
         if (typeof mod == "string" && mod.includes('d')){
 
+            
             mod=this.addDiceModifier(mod); // add the plus
+
+           
             this.reasons.push(`${reason}: ${mod}`);
         } else {
         mod=gb.realInt(eval(mod));
@@ -198,21 +201,28 @@ export default class CharRoll extends BasicRoll{
     async rollRun(){
         this.flavor+=`<div>${gb.trans('Running','SWADE')}</div>`;
 
-        let ferinfo=''
-         if (gb.systemSetting('enableWoundPace')){
-            let woundMod=0-gb.realInt(this.actor.system.wounds.value);
+        let ferinfo=''         
+        if (gb.systemSetting('enableWoundPace')){
+           let woundMod=0-gb.realInt(this.actor.system.wounds.value);
             if (woundMod<-3){
                 woundMod=-3
             }
-            this.flavor+=`<div>${gb.trans('Wounds','SWADE')}: ${woundMod}</div>`;
+
+            if (woundMod){
+                ferinfo+=` (${gb.trans('Wounds','SWADE')}: ${woundMod})`;
+            }
+
+
+            
         } 
         
         /// wounds
        // this.addModifier(-2,gb.trans('Wounds','SWADE'))
-        this.addModifier(this.actor.system.stats.speed.adjusted,gb.trans('Pace','SWADE'))
+        this.addModifier(this.actor.system.pace.ground,gb.trans('Pace','SWADE')+ferinfo)
+        this.addModifier(this.actor.system.pace.running.die.mod,gb.trans('RunningMod','SWADE'))
      //   this.baseModifiers();
      this.isRunDie();
-       return await this.buildRoll(this.actor.system.stats.speed.runningDie,false,this.mod);
+       return await this.buildRoll(this.actor.system.pace.running.die,false,this.mod);
     }
 
     async rollAtt(attribute,rof=1){
@@ -237,7 +247,21 @@ export default class CharRoll extends BasicRoll{
         
         this.baseModifiers();
        // this.addModifier(this.actor.system.attributes[attribute].die.modifier,gb.trans('ModAttr'))
-       this.addModifier(gb.attModifier(this.actor,attribute),gb.trans('ModAttr'))
+
+      
+       this.actor.system.attributes[attribute].effects.map(e=>{
+        this.addModifier(e.value,e.label);
+       })
+   
+
+      
+
+    this.addModifier(this.actor.system.attributes[attribute].die.modifier,gb.trans('ModAttr'));
+
+      // mod+=actor.system.attributes[att].die.modifier;
+   
+      
+       //this.addModifier(gb.attModifier(this.actor,attribute),gb.trans('ModAttr'))
       //  console.log(this.mod);
     //    console.log(this.reasons);
         
@@ -248,6 +272,12 @@ export default class CharRoll extends BasicRoll{
 
         this.actor.system.stats.globalMods[attribute].map(e=>{
             this.addModifier(e.value,`${e.label} (${gb.trans(`GlobalMod.${attribute.charAt(0).toUpperCase() + attribute.slice(1)}`,'SWADE')})`);
+        })
+
+
+        /// global trait mod
+        this.actor.system.stats.globalMods.trait.map(e=>{
+            this.addModifier(e.value,`${e.label} (${gb.trans(`GlobalMod.Trait`,'SWADE')})`);
         })
 
 
@@ -302,6 +332,10 @@ export default class CharRoll extends BasicRoll{
       //  console.log(skillName,rof)
 
         this.rof=rof;
+
+        if (this.item){
+            await this.addItemFlavor(this.item)
+        }
        
 
         if (this.item && this.manageshots){
@@ -314,7 +348,7 @@ export default class CharRoll extends BasicRoll{
 
             if (this.canCast){
                 this.powerCount();
-                gb.say(`${this.getItemCard(this.item)}${gb.trans('InnatePower')}`,this.actor.name);
+                gb.say(`${await this.getItemCard(this.item)}${gb.trans('InnatePower')}`,this.actor.name);
             }
             this.dontDisplay=true;            
             return 
@@ -345,11 +379,11 @@ export default class CharRoll extends BasicRoll{
         this.addFlag('rolltype','skill');
 
         if (item===undefined){
-            item = await game.packs.get(gb.systemSetting("coreSkillsCompendium")).getDocument(await game.packs.get(gb.systemSetting("coreSkillsCompendium")).index.find(el => el.name == skillName)._id);
+            item = await game.packs.get(gb.systemSetting("coreSkillsCompendium")).getDocument(await game.packs.get(gb.systemSetting("coreSkillsCompendium")).index.find(el => el.name == skillName)?.id);
             skillName=`${gb.trans('Unskilled')} (${skillName})`;
             dieType=4;
             this.addModifier(-2,gb.trans('Unskilled'));
-            if (item.system?.attribute != "") {
+            if (item && item.system?.attribute != "") {
                 this.actor.system.stats.globalMods[item.system.attribute].map(e=>{
                     this.addModifier(e.value,`${e.label} (${gb.trans(`GlobalMod.${item.system.attribute.charAt(0).toUpperCase() + item.system.attribute.slice(1)}`,'SWADE')})`);
                 })
@@ -366,7 +400,17 @@ export default class CharRoll extends BasicRoll{
                 wildDie=item.system["wild-die"].sides;
             } 
 
-            this.addModifier(gb.skillModifier(item),gb.trans('ModSkill'))
+
+            item.system.effects.map(e=>{
+                this.addModifier(e.value,e.label);
+            })
+        
+            this.addModifier(item.system.die.modifier,gb.trans('ModSkill'));
+            //mod+=item.system.die.modifier;
+
+            
+          //  this.addModifier(gb.skillModifier(item),gb.trans('ModSkill'))
+
             if (item.system?.attribute != "") {
                 this.actor.system.stats.globalMods[item.system.attribute].map(e=>{
                     this.addModifier(e.value,`${e.label} (${gb.trans(`GlobalMod.${item.system.attribute.charAt(0).toUpperCase() + item.system.attribute.slice(1)}`,'SWADE')})`);
@@ -378,7 +422,10 @@ export default class CharRoll extends BasicRoll{
             }
         }
         
-        
+        /// global trait mod
+        this.actor.system.stats.globalMods.trait.map(e=>{
+            this.addModifier(e.value,`${e.label} (${gb.trans(`GlobalMod.Trait`,'SWADE')})`);
+        })
         
         
         if (this.groupRoll){
@@ -427,9 +474,9 @@ export default class CharRoll extends BasicRoll{
         this.manageshots=false;
     } */
 
-    getItemCard(item){
+    async getItemCard(item){
 
-        const description=TextEditor.enrichHTML(item.system.description,{async:false}) /// async false will be removed
+        const description=await TextEditor.enrichHTML(item.system.description) /// async false will be removed
 
         return `<div class="swade chat-card swadetools-pseudocard"><header class="card-header flexrow">
         <img src="${item.img}" title="${item.name}" width="36" height="36">
@@ -442,13 +489,17 @@ export default class CharRoll extends BasicRoll{
 
     }
 
+    async addItemFlavor(item){
+        this.flavorAdd.start=await this.getItemCard(item);
+    }
+
     isItem(item,countshots=true){
         this.item=item;
 
      //   console.log(item);
-     const description=TextEditor.enrichHTML(item.system.description,{async:false}) /// async false will be removed
+   //  const description=await TextEditor.enrichHTML(item.system.description) /// async false will be removed
 
-     this.flavorAdd.start=this.getItemCard(item);
+     
 
      /*    this.flavorAdd.start=`<div class="swade chat-card swadetools-pseudocard"><header class="card-header flexrow">
         <img src="${item.img}" title="${item.name}" width="36" height="36">
@@ -705,7 +756,7 @@ export default class CharRoll extends BasicRoll{
         let combatant=gb.actorCombatant(this.actor)
       //  console.log(this.actor,combatant.id,'wild');
         if (combatant){
-            await gb.setFlagCombatant(game.combat,combatant,gb.moduleName,'removeVulnerable',0);
+            await gb.setFlagCombatant(game.combat,combatant,gb.moduleName,'removeVulnerable',false);   //EternalRider: I don't know why the 0 in my test will not work
         }
     }
 
@@ -767,6 +818,10 @@ export default class CharRoll extends BasicRoll{
         this.rolltype='damage';
 
         let raisetext=``;
+
+        if (this.item){
+            await this.addItemFlavor(this.item)
+        }
 
         if (this.dmgraise){
             raisetext=`(+${gb.trans('Targetraise')})`;

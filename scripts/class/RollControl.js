@@ -182,6 +182,9 @@ export default class RollControl {
     }
 
     addButtons(){
+
+       
+        
         if (this.rolltype!==undefined){ ///roll comes from swade tools
             this.html.append('<div class="swadetools-relative"><div class="swadetools-rollbuttonwrap"></div></div>');
             if (!this.isCritical() || gb.settingKeyName('Dumb Luck') || gb.systemSetting('dumbLuck')){
@@ -221,7 +224,7 @@ export default class RollControl {
 
     async doActions(){
 
-     //   console.log('calling do actions');
+     
 
         
      
@@ -376,7 +379,7 @@ export default class RollControl {
                    // actor.update({'data.status.isDistracted':true,'data.status.isVulnerable':true})
                 },500)
               //  char.updateData({'status.isDistracted':false,'status.isVulnerable':true})/// just to make sure is disabled
-              gb.setFlagCombatant(game.combats.get(this.chat.flags?.["swade-tools"]?.usecombat),{id:this.chat.flags?.["swade-tools"]?.usecombatant},'swade-tools','removeVulnerable',1)
+              gb.setFlagCombatant(game.combats.get(this.chat.flags?.["swade-tools"]?.usecombat),{id:this.chat.flags?.["swade-tools"]?.usecombatant},'swade-tools','removeVulnerable',true)   //EternalRider: I don't know why the 0 in my test will not work
             //    game.combats.get(this.chat.data.flags?.["swade-tools"]?.usecombat).updateCombatant({_id:this.chat.data.flags?.["swade-tools"]?.usecombatant,['flags.swade-tools.removeVulnerable']:1});
               //  actor.update({'data.status.isDistracted':false,'data.status.isVulnerable':false}) /// just to make sure is disabled
             }
@@ -512,8 +515,15 @@ export default class RollControl {
                         
                     } else if (rolltype=='soak'){
 
+                        let unstoppable=false;
                         let prevWounds=this.chat.flags["swade-tools"].wounds;
-                        this.damageTarget(target,this.soak(prevWounds));
+
+                        if (this.chat.flags["swade-tools"]?.unstoppable_wounds){
+                            prevWounds=this.chat.flags["swade-tools"].unstoppable_wounds
+                            unstoppable=true;
+                        } 
+                     
+                        this.damageTarget(target,this.soak(prevWounds),unstoppable);
                     }
 
                    
@@ -608,6 +618,18 @@ export default class RollControl {
                         
 
 
+                    }).on('mouseenter','a.swadetools-rolldamage',(event)=>{
+
+                        let el=event.currentTarget;
+                        let targetid=$(el).attr('data-swadetools-targetid');
+                        gb.hoverToken(targetid);
+
+                    }).on('mouseleave','a.swadetools-rolldamage',(event)=>{
+
+                        let el=event.currentTarget;
+                        let targetid=$(el).attr('data-swadetools-targetid');
+                        gb.hoverToken(targetid,false);
+
                     }).ready(()=>{
                           
                         this.scrollChat();/// force scroll                  
@@ -633,6 +655,18 @@ export default class RollControl {
 
                        
             
+                    }).on('mouseenter','a.swadetools-applydamage',(event)=>{
+
+                        let el=event.currentTarget;
+                        let targetid=$(el).attr('data-swadetools-targetid');
+                        gb.hoverToken(targetid);
+
+                    }).on('mouseleave','a.swadetools-applydamage',(event)=>{
+
+                        let el=event.currentTarget;
+                        let targetid=$(el).attr('data-swadetools-targetid');
+                        gb.hoverToken(targetid,false);
+
                     }).on('click','a.swadetools-soakdamage',(event)=>{
                         let el=event.currentTarget;
 
@@ -641,7 +675,20 @@ export default class RollControl {
                         this.html.off('click','a.swadetools-soakdamage'); */
                         let targetid=$(el).attr('data-swadetools-targetid');
                         let raise=gb.realInt($(el).attr('data-swadetools-raise'));
+                       // let unstoppable_wounds=gb.realInt($(el).attr('data-swadetools-unstoppable'));
                         this.soakFunction(targetid,raise);
+                    }).on('mouseenter','a.swadetools-soakdamage',(event)=>{
+
+                        let el=event.currentTarget;
+                        let targetid=$(el).attr('data-swadetools-targetid');
+                        gb.hoverToken(targetid);
+
+                    }).on('mouseleave','a.swadetools-soakdamage',(event)=>{
+
+                        let el=event.currentTarget;
+                        let targetid=$(el).attr('data-swadetools-targetid');
+                        gb.hoverToken(targetid,false);
+
                     }).on('click','a.swadetools-situational-link',(event)=>{
                         let el=event.currentTarget;
                         $(el).closest('.swadetools-targetwrap').find('.swadetools-situational-info').slideToggle();
@@ -1171,7 +1218,11 @@ export default class RollControl {
             }
 
             if (this.chat.flags["swade-tools"]?.wildattack){
-                charRoll.addModifier(2,gb.trans('WildAttack'));
+                let wildDmg=2;
+                if (this.getActor().getFlag('swade','wildAttackDamage')!==undefined){
+                    wildDmg=gb.realInt(this.getActor().getFlag('swade','wildAttackDamage'));
+                }
+                charRoll.addModifier(wildDmg,gb.trans('WildAttack'));
             }
 
 
@@ -1218,7 +1269,7 @@ export default class RollControl {
         }
     }
 
-    damageTarget(target,newWounds=null){
+    damageTarget(target,newWounds=null,unstoppable=0){
         let applyDmg=false;
         let raisecount;
         let soakClass='';
@@ -1226,7 +1277,8 @@ export default class RollControl {
         let area='torso';
         let total=this.roll.total+this.gmmod;
         let targetInfo='';
-
+        let action=false;
+       // let unstoppable=0;
         
         
 
@@ -1241,9 +1293,15 @@ export default class RollControl {
         area=this.chat.flags['swade-tools'].usecalled;
     }
 
+    if (this.chat.flags['swade-tools'].useaction){
+        action=this.chat.flags['swade-tools'].useaction;
+    }
+
+
+   //console.log(this.chat.flags);
     
       /// heavy armor check
-      if (gb.isHeavyArmor(target.actor,area) && !item?.system?.isHeavyWeapon){ //heavy armor but no heavy weapon
+      if (gb.isHeavyArmor(target.actor,area) && !gb.isHeavyWeapon(item,action)){ //heavy armor but no heavy weapon
         raisecount=-1 // no damage
         targetInfo+=`<li>${gb.trans('HeavyArmorWarn')}</li>`;
       } else {
@@ -1274,7 +1332,17 @@ export default class RollControl {
      /// adds AP
         let apextra=0;
         if (item.system.ap){
-            apextra=gb.realInt(item.system.ap);
+
+            let useAp=item.system.ap
+
+            if (this.chat.flags["swade-tools"]?.useaction) {
+                let actionKey=this.chat.flags["swade-tools"].useaction
+                if (item.system.actions.additional[actionKey]?.ap){
+                    useAp=item.system.actions.additional[actionKey].ap
+                }
+            }
+
+            apextra=gb.realInt(useAp);
 
             let useactor=this.getItemOwner();
 
@@ -1293,6 +1361,8 @@ export default class RollControl {
             }
         }
 
+
+       
      
          raisecount=gb.raiseCount(total,toughness-apextra);
     }
@@ -1302,6 +1372,10 @@ export default class RollControl {
             if (raisecount==0){ //0 wounds
                 raisecount=-1  ///not even shaken
             } 
+
+            if (unstoppable && raisecount>1){
+                raisecount=1;
+            }
         }
      //   console.log(toughness+armor);
      //   console.log(raisecount);
@@ -1326,6 +1400,7 @@ export default class RollControl {
             }
 
             ///unstoppable
+            
             if (raisecount>1){
                 let char=new Char(target.actor);                
                 
@@ -1340,7 +1415,10 @@ export default class RollControl {
 
 
                     if (!attackerIsJoker){
-                        raisecount=1
+
+                        unstoppable=raisecount;
+                        raisecount=1;
+                        
                     }                
                     
                 }
@@ -1464,6 +1542,7 @@ export default class RollControl {
                 
                 charRoll.addFlag('usetarget',target.id);
                 charRoll.addFlag('wounds',raisecount);
+                charRoll.addFlag('unstoppable_wounds',unstoppable);
                 if (isvehicle){
                     await charRoll.rollSkill(gb.getDriverSkill(target.actor));
                 } else {
@@ -1500,7 +1579,7 @@ export default class RollControl {
                     await char.outOfControl();
                 } else
                 if (char.is('isShaken')){
-                    if (!char.hasEdgeSetting('Hardy')){
+                    if (!char.hasAbilitySetting('Hardy')){
                         char.applyWounds(1);
                     } else {
                         ui.notifications.info(`${target.actor.name} ${gb.trans('HardyWarn')}`)
@@ -1698,16 +1777,24 @@ export default class RollControl {
        // console.log(this.chat.flags?.['swade-tools']);
 
     //   console.log(chatflags,roll.total);
+
+   // console.log(chatflags);
         
-        if (gb.raiseCount(roll.total)>=0 && chatflags?.arcanefail?.pp){
+        if (gb.raiseCount(roll.total)>=0 && chatflags?.arcanefail?.arcaneItem){
 
        //     console.log('pass');
 
-            if (chatflags?.arcanefail?.arcaneItem){
-                char.spendPP(chatflags?.arcanefail?.pp,chatflags.arcanefail.arcaneItem);
+       
+
+           
+
+                if (chatflags?.arcanefail?.pp){
+                    char.spendPP(chatflags?.arcanefail?.pp,chatflags.arcanefail.arcaneItem);
+                }
+               
                 flavor=flavor.replace(`<div>${gb.trans('FailedPP')}</div>`,'');
                 chatflags.arcanefail={}; ///remove arcane fail pp to avoid repeat
-            }
+            
             
         }
             
@@ -1745,11 +1832,18 @@ export default class RollControl {
        // console.log(this.roll);
 
         let dices=this.roll.terms[0].dice;
-       // console.log(dices);
+
+       
         if (dices!==undefined){ /// extras roll one dice only
         let ones=dices.filter(el=>el.total==1);
         if (ones.length>1 && ones.length>(dices.length/2)){
-            return true;
+            // check wild die
+            if (dices.filter(el=>el.options.flavor=="Wild Die" && el.total>1).length>0){
+                return false;
+            } else {
+                return true;
+            }
+            
         } 
         }
 
@@ -1789,16 +1883,17 @@ export default class RollControl {
 
         let all_around_target=canvas.tokens.placeables.filter(t=>
             t.id!=attacker.id // not the attacker
+            && gb.getRange(target,t,true)==1 /// adjacent
+            && t.actor!==undefined /// prevent no actor bug
+            && t?.actor?.type!='vehicle'
             && !(attacker.actor.isToken===false && attacker.actor.id==t?.actor?.id)
             && t.id!=target.id /// not the target
             && t.visible  /// is visible   
             && t.document.overlayEffect!=CONFIG.controlIcons.defeated   /// not defeated (out of combat)
-            && !t.actor.effects.find(el=>el.name=="Incapacitated")  /// not defeated (out of combat)
+            && !t.actor.effects.find(el=>el.name==gb.trans('Incap',"SWADE") && el.disabled==false)  /// not defeated (out of combat)
             && !t.combatant?.defeated /// not defeated 
-            && t?.actor?.system.status.isStunned!==true /// not stunned    
-            && t?.actor?.type!='vehicle'
-            && t.document.disposition!=0        
-            && gb.getRange(target,t,true)==1 /// adjacent
+            && t?.actor?.system.status.isStunned!==true /// not stunned               
+            && t.document.disposition!=0               
         )
 
      //  console.log('all_around',all_around_target.length)
@@ -1845,6 +1940,15 @@ export default class RollControl {
             gangup=4
         }
 
+        
+        if (gangup>0){
+            let targetActor=new Char(target.actor);
+            if (targetActor.hasAbilitySetting('All-Around Vision')){
+                gangup=gangup-1
+               // console.log('all-around vision')
+            }
+            
+        }
        // console.log('gangup',gangup);
 
         return gangup;

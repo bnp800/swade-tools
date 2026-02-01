@@ -14,6 +14,8 @@ export default class ItemRoll extends CharRoll{
         this.addFlavor(item.name);
         this.isItem(item);
 
+
+     //   console.log(this.manageshots);
         
 
         /* if (actor.data.type=='vehicle'){
@@ -47,8 +49,12 @@ export default class ItemRoll extends CharRoll{
             
             
 
+            
            
-            this.addModifier(action.skillMod,action.name);
+           // this.addModifier(action.traitMod,action.name);
+           this.addModifier(action.modifier,action.name); /// => changed name
+
+            
             let rof=1;
             if (action.dice!==undefined){
                rof=action.dice;
@@ -73,7 +79,9 @@ export default class ItemRoll extends CharRoll{
 
         } else if (action.type=='damage'){
             this.addModifier(action.modifier,action.name);
-            let damage=this.item.system.damage;            
+            let damage=this.item.system?.damage;      
+            
+            
 
             if (action.override){
                 damage=action.override;
@@ -86,7 +94,7 @@ export default class ItemRoll extends CharRoll{
            
 
             this.addDmgMod();
-            await this.rollDamage(damage,'',this.raiseDie());
+            await this.rollDamage(damage,this.getApInfo(action),this.raiseDie());
         }
 
         
@@ -133,7 +141,7 @@ export default class ItemRoll extends CharRoll{
 
     usePP(extraPP){
         if (this.item.type=='power'){
-            let usepp=gb.realInt(this.item.system.pp)+gb.realInt(extraPP);
+            let usepp=gb.getPPCostMod(this.item)+gb.realInt(extraPP);
             if (usepp<0){ /// min 0
                 usepp=0
             }
@@ -174,10 +182,46 @@ export default class ItemRoll extends CharRoll{
         
     }
 
+    getApInfo(action=false){
+        let extrainfo='';
+
+        let finalAp=this.item.system.ap;
+
+        if (action && action?.ap){
+            finalAp=action.ap;
+        }
+        let reason=[];
+
+        if (this.actor?.system?.stats?.globalMods?.ap && this.actor?.system?.stats?.globalMods?.ap.length > 0) {
+            this.actor?.system?.stats?.globalMods?.ap.forEach(el => {
+                finalAp=finalAp+el.value
+                reason.push(`${el.label}: ${el.value}`)
+            });
+
+            if (finalAp<0){
+                finalAp=0
+            }
+        }
+
+        if (this.item.system.ap){
+            extrainfo+=` [${gb.trans('Ap','SWADE')}: ${finalAp}`;
+        
+
+        if (reason.length>0){
+            extrainfo+=` (${reason.join(', ')})`
+        }
+
+            extrainfo+=`]`
+      
+        }
+
+        return extrainfo;
+    }
+
     async rollBaseDamage(){
         this.defineAction('damage');
         this.addDmgMod();
-        let extrainfo='';
+        /* let extrainfo='';
 
         let finalAp=this.item.system.ap;
         let reason=[];
@@ -203,9 +247,11 @@ export default class ItemRoll extends CharRoll{
 
             extrainfo+=`]`
       
-        }
+        } */
+
         
-        await this.rollDamage(this.item.system.damage,extrainfo,this.raiseDie());
+        
+        await this.rollDamage(this.item.system.damage,this.getApInfo(),this.raiseDie());
     }
 
     

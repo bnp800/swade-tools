@@ -7,8 +7,11 @@ export const moduleName='swade-tools'
 
 export const attributes=['agility','smarts','spirit','strength','vigor']
 export const edgesNaming=['Elan','No Mercy','Iron Jaw','Combat Reflexes','Dodge','Block','Improved Block','Frenzy', 'Formation Fighter','Rapid Fire','Soldier','Brawny','Combat Acrobat','Improved Frenzy','Ace'];
-export const abilitiesNaming=['Construct','Hardy','Undead','Swat','Unstoppable','Pack Tactics','Rifts Uncanny Reflexes'];
+export const abilitiesNaming=['Construct','Hardy','Undead','Swat','Unstoppable','Pack Tactics','Rifts Uncanny Reflexes','All-Around Vision'];
 export const settingRules=['Dumb Luck','Unarmored Hero','Wound Cap'];
+
+export const wounds_id='woundswadetools0';
+export const fatigues_id='fatiguswadetools';
 
 export const RoFBullets={
     2: 5,
@@ -179,7 +182,7 @@ export const getTokenCoordinates=(token)=>{
     
 }
 
-export const getDistance=(origin,target,grid=false,checkWalls=false)=>{
+/* export const getDistance=(origin,target,grid=false,checkWalls=false)=>{
    
     const ray = new Ray(origin, target);
 
@@ -197,17 +200,36 @@ export const getDistance=(origin,target,grid=false,checkWalls=false)=>{
    // console.log(origin,target,);
   //  console.log(CONFIG.Canvas.losBackend.testCollision(origin,target));
   //  console.log(ray.getRayCollisions());
-    
+   
     
     //console.log(getRayCollisions(ray,{mode:'any'}))
     return canvas.grid.measureDistances([{ ray }], {gridSpaces: grid})[0];
-}
+} */
+
+
+export const getDistance = (origin, target, grid = false, checkWalls = false) => {
+    //const ray = new Ray(origin, target);
+
+    if (checkWalls) {
+        if (CONFIG.Canvas.polygonBackends['move'].testCollision(origin, target, { type: "move", mode: "any" }) === true) {
+            return null;
+        }
+    }
+
+    // A função measurePath agora requer um array de pontos
+    const path = [origin, target]; 
+
+    const result=canvas.grid.measurePath(path, { gridSpaces: grid });
+    //console.log(result);
+    return result.distance;
+} 
 
 export const getRange=(origin,target,checkWalls=false)=>{ /// walls return null
    // const ray = new Ray(origin, target);
 
  
-    const grid_unit = canvas.grid.grid.options.dimensions.distance
+   // const grid_unit = canvas.grid.options.dimensions.distance
+    const grid_unit = canvas.grid.distance // v12
     let grid=false;
    if (origin.scene.gridType==1){
        grid=true;
@@ -332,6 +354,12 @@ export const explodeAllDice=(weaponDamage)=>{
     let regexDiceExplode = /d[0-9]{1,2}/g;
     weaponDamage = weaponDamage.replace(/x|=/g,'') /// remove x and = if it already has
     weaponDamage = weaponDamage.replace(regexDiceExplode, "$&x");
+
+    /// Added (dont explode 1d1) - thanks to @EternalRider
+    let noExplode = /(d[0-1])(x)/g;
+    weaponDamage = weaponDamage.replace(noExplode, "$1");
+ 
+
     return weaponDamage;
    }
 
@@ -520,21 +548,25 @@ export const penalArmorMinStr=(actor)=>{
 
 
 export const  setFlagCombatant=async (combat,combatant,scope,flag,value)=>{
-    let update=[{_id:combatant.id,['flags.'+scope+'.'+flag]:value}]
-   // console.log(update);
-     //combat.updateCombatant(update);
+   // let update=[{_id:combatant.id,['flags.'+scope+'.'+flag]:value}]
+ 
+   /// silver tape 
+   setTimeout(async ()=>{
+     await game.combats.get(combat.id).combatants.get(combatant.id).setFlag(scope,flag,value); /// combatant flag was causing bug => revert if ok   
+    },500)
 
-    /*  log(combat.id);
-     log(combatant.id);
-     log(update); */
+   //  game.socket.emit('module.'+moduleName,{combat,combatant,scope,flag,value});
+
      
-    await combat.updateEmbeddedDocuments('Combatant',update);
+
+     
+
+     
+     
+    
     
 }
 
-export const simpleAttRoll=(attribute,actor)=>{
-    
-}
 
 export const actorCombatant=(actor)=>{
     if (game.combat){
@@ -557,19 +589,39 @@ export const actorCombatant=(actor)=>{
 
 export const actorIsJoker=(actor)=>{
 
+    log('cheking if actor is joker');
    // actor.token.id==el.tokenId
   /// removed  flags.swade.hasJoker (swade bug)
-    if(game.combat && game.combat.combatants.filter(el=>el.flags?.swade?.cardValue>14 && el?.actor?.id===actor.id && 
+    if(game.combat && game.combat.combatants.filter(el=>(el.flags?.swade?.cardValue>14 || el?.initiative>15) && el?.actor?.id===actor.id && 
         (!actor?.isToken || actor.token.id==el.token.id)  /// check if it's the same token
         ).length>0){
 
-       
+       log('actor is joker');
 
         return true;
     } else {
      
         return false;
     }
+}
+
+export const getPPCostMod=item=>{
+    if (!item) return 0;
+
+  // custo base do item
+  const baseCost = realInt(item.system?.pp);
+
+  // todos os modifiers ativos
+  const activeModifiers = item.effects.filter(e =>
+    e.type === "modifier" && !e.disabled
+  );
+
+  // soma dos custos dos modifiers ativos
+  const modifiersCost = activeModifiers.reduce((total, effect) => {
+    return total + realInt(effect.system?.cost);
+  }, 0);
+
+  return baseCost + modifiersCost;
 }
 
 export const actorIsConvicted=(actor)=>{
@@ -661,7 +713,7 @@ export const rollResist=(traitName,skillMod)=>{
                 }
 }
 
-export const attModifier=(actor,att)=>{
+/* export const attModifier=(actor,att)=>{
     
     let mod=0;
      actor.system.attributes[att].effects.map(e=>{
@@ -671,9 +723,9 @@ export const attModifier=(actor,att)=>{
      mod+=actor.system.attributes[att].die.modifier;
  
      return mod;
- }
+ } */
 
-export const skillModifier=(item)=>{
+/* export const skillModifier=(item)=>{
     
    let mod=0;
     item.system.effects.map(e=>{
@@ -683,7 +735,7 @@ export const skillModifier=(item)=>{
     mod+=item.system.die.modifier;
 
     return mod;
-}
+} */
    
 
 
@@ -714,7 +766,7 @@ export const showTemplate=(type,item)=>{
         }
         // Adjust to grid distance
 
-        templateData.distance = templateData.distance*canvas.grid.grid.options.dimensions.distance
+        templateData.distance = templateData.distance*canvas.grid.distance /// v12
         
         // noinspection JSPotentiallyInvalidConstructorUsage
         const template_base = new CONFIG.MeasuredTemplate.documentClass(
@@ -805,11 +857,28 @@ export const settingTextArea=(setting,title,hint)=>{
 
 }
 
+export const hoverToken=(tokenId,hoverIn=true)=>{
+    if (hoverIn){
+        canvas.tokens.get(tokenId)._onHoverIn(new PIXI.FederatedEvent("pointerover"), {hoverOutOthers: true})
+    } else {
+        canvas.tokens.get(tokenId)._onHoverOut(new PIXI.FederatedEvent("pointerover"))
+    }
+    
+}
+
 export const log=(...args)=>{
     if (setting('debugger')){
         console.log(args);
     }
+   
+}
+
+
+export const lognow=(arg)=>{
+    if (setting('debugger')){
+        console.log(JSON.parse(JSON.stringify(arg))); //// === > console.log AT THE EXACT TIME OF EXECUTION
     
+    }
 }
 
 export const trace=(...args)=>{
@@ -825,6 +894,26 @@ export const getArmorArea=(actor,area='torso')=>{
     return actor.system.stats.toughness.armor;
    } else {
     return actor.armorPerLocation[area.toLowerCase()];
+   }
+    
+}
+
+export const isHeavyWeapon=(item,action='')=>{
+   // let heavy=false;
+   let heavy=item?.system?.isHeavyWeapon;
+
+   if (!action){
+    return heavy;
+   } else {
+        if (!heavy){
+           // console.log(action);
+            if (item?.system?.actions?.additional?.[action]!==undefined){  /// check for action
+                return item.system.actions.additional[action]?.isHeavyWeapon;
+            } else {
+                return heavy;
+            }
+            
+        }
    }
     
 }
@@ -967,18 +1056,31 @@ export const noneReloadType= async (actor,item,shots) => {
                ui.notifications.error(trans('NoAmmoSet','SWADE'));
                return false;
             } else {
-                let gearitem=actor.items.filter(el=>el.type=='gear' && el.name.trim()==gearname)[0];
+                let gearitem=actor.items.filter(el=>(el.type=='gear' || el.type=='consumable') && el.name.trim()==gearname)[0];
 
             
 
             let shotsToFull=shots;
 
             if (!gearitem){
+             //   console.log('here');
                 ui.notifications.warn(trans('NotEnoughAmmo','SWADE'));
                 return false;
 
             } else {
-                let gearshots=realInt(gearitem.system.quantity);
+                let gearshots;
+               
+                if (gearitem.type=='gear'){
+                    gearshots=gearitem.system.quantity;                 
+
+                } else
+                if (gearitem.type=='consumable'){
+                    gearshots=gearitem.system.charges.value                  
+                }
+
+                gearshots=realInt(gearshots);
+
+
                 let usedgearshots;
                 if (gearshots<shotsToFull){
                     ui.notifications.warn(trans('NotEnoughAmmo','SWADE'));
@@ -988,8 +1090,15 @@ export const noneReloadType= async (actor,item,shots) => {
                 }
 
                 let newgearshots=gearshots-usedgearshots;
+
+                if (gearitem.type=='gear'){
+
+                    await gearitem.update({"system.quantity":newgearshots})
+                } else if (gearitem.type=='consumable'){
+                    await gearitem.update({"system.charges.value":newgearshots})
+                }
               
-             await gearitem.update({"data.quantity":newgearshots})
+            
              return true;
             
             }
@@ -1204,3 +1313,39 @@ export const btnAction = { /// button functions
     }
     
 }
+
+/**
+ * 等待直到给定的函数返回true，或者达到最大迭代次数
+ * @param {() => boolean} fn 要等待的函数，返回true时停止等待
+ * @param {number} maxIter 最大迭代次数
+ * @param {number} iterWaitTime 每次迭代的等待时间
+ * @param {number} i 迭代次数
+ * @returns {Promise<boolean>} 是否等待成功
+ */
+export async function waitFor(fn, maxIter = 600, iterWaitTime = 100, i = 0) {
+    const continueWait = (current, max) => {
+      /* negative max iter means wait forever */
+      // 负的最大迭代次数表示无限等待
+      if (maxIter < 0) return true;
+      return current < max;
+    }
+  
+    while (!fn(i, ((i * iterWaitTime) / 100)) && continueWait(i, maxIter)) {
+      // 当函数返回false，并且还未达到最大迭代次数时，执行以下操作
+      i++;
+      await wait(iterWaitTime);
+    }
+    // 如果达到最大迭代次数，则返回false，否则返回true
+    return i === maxIter ? false : true;
+  }
+
+    /**
+   * Helper function. Waits for a specified amount of time in milliseconds (be sure to await!).
+   * Useful for timings with animations in the pre/post callbacks.
+   *
+   * @param {Number} ms Time to delay, in milliseconds
+   * @returns Promise
+   */
+    export async function wait(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
