@@ -218,13 +218,20 @@ export default class SheetControl {
 
 
                 if(!gb.setting('itemNameClick')){
+                    // When itemNameClick is false, override click to show dialog
                     parentDiv.addClass('swadetools-noshow')
+                    
+                    target.off('click').on('click',ev=>{
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        let item=new ItemDialog(this.sheet.actor,itemId);
+                        item.showDialog();
+                    })
+                } else {
+                    // When itemNameClick is true, keep default behavior (show info)
+                    // Remove any previous swadetools click handlers
+                    parentDiv.removeClass('swadetools-noshow')
                 }
-                
-                target.off('click').on('click',ev=>{
-                    let item=new ItemDialog(this.sheet.actor,itemId);
-                     item.showDialog();
-                })
 
 
                 if (type=='power' && !target.closest('li').find('.swade-tools-template-buttons').length){

@@ -367,7 +367,9 @@ export default class CharRoll extends BasicRoll{
         this.rolltype='skill';
         this.skillName=skillName;
        
-        let item=this.actor.items.filter(el=>el.type=='skill' && el.name==skillName)[0];
+        // Use helper function to find skill by name or SWID
+        let item = gb.findSkillByNameOrSwid(this.actor, skillName);
+        
         let wildCard=this.actor.isWildcard;
         let dieType;
         let wildDie=false;

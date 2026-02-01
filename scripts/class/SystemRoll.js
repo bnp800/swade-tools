@@ -34,7 +34,8 @@ export default class SystemRoll {
 
     async rollSkill(skillId){
        
-        if (gb.setting('simpleRolls')){
+        if (!gb.setting('simpleRolls')){
+            // Use simplified SWADE Tools dialog
             let item=this.actor.items.get(skillId);
 
             
@@ -101,6 +102,7 @@ export default class SystemRoll {
            
 
         } else {
+         // Use system native dialog
          //   this.addJokerModifier();  
          await Hooks.once("renderChatMessageHTML", (chat, html,data) => { 
            // console.log(data);
@@ -137,7 +139,8 @@ export default class SystemRoll {
     }
 
     async rollRun(){
-        if (gb.setting('simpleRolls')){
+        if (!gb.setting('simpleRolls')){
+            // Use simplified SWADE Tools dialog
             let content=`<div class="swadetools-itemfulldata">
                     <strong>${gb.trans('Running','SWADE')}</strong>: ${this.actor.system.pace.ground}+d${this.actor.system.pace.running.die}${gb.stringMod(this.actor.system.pace.running.mod)}
                     </div>
@@ -170,6 +173,7 @@ export default class SystemRoll {
                         }
                     }).render(true);
         } else {
+            // Use system native dialog
             await this.actor.rollRunningDie();
         }
         
@@ -185,7 +189,8 @@ export default class SystemRoll {
 
     async rollAtt(attribute){
 
-        if (gb.setting('simpleRolls')){
+        if (!gb.setting('simpleRolls')){
+            // Use simplified SWADE Tools dialog
 
             let attModifier=gb.realInt(this.actor.system.attributes[attribute].die.modifier);
 
@@ -231,7 +236,7 @@ export default class SystemRoll {
                     }).render(true);
 
         } else {
-    
+            // Use system native dialog
          //   console.log('called');
            // this.addJokerModifier();   
            await Hooks.once("renderChatMessageHTML", (chat, html,data) => { 

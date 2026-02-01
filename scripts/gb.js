@@ -319,6 +319,21 @@ export const findAttr=(attr)=>{
 
 }
 
+export const findSkillByNameOrSwid=(actor, skillName)=>{
+    if (!actor || !skillName) return undefined;
+    
+    // First try to find by exact name match
+    let skill = actor.items.find(el => el.type === 'skill' && el.name === skillName);
+    
+    // If not found, try by SWID (slugified name for cross-language compatibility)
+    if (!skill) {
+        const slugifiedName = skillName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        skill = actor.items.find(el => el.type === 'skill' && el.system?.swid === slugifiedName);
+    }
+    
+    return skill;
+}
+
 export const GMPlayer=()=>{return game.users.filter((el)=> el.isGM===true)[0]}
 
 export const mainGM=()=>{

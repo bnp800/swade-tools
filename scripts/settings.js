@@ -63,7 +63,7 @@ restricted: true
     game.settings.register(gb.moduleName, 'itemNameClick', {
 		name: gb.trans('SettingsItemNameClick'),
 		hint: gb.trans('SettingsItemNameClickHint'),
-		default: false,
+		default: true,
 		scope: "world",
 		type: Boolean,
 		config: false
@@ -131,7 +131,7 @@ restricted: true
       game.settings.register(gb.moduleName, 'simpleRolls', {
         name: gb.trans('SettingSimpleRolls'),
         hint: gb.trans('SettingSimpleRollsHint'),
-        default: true,
+        default: false,
         scope: "world",
         type: Boolean,
         config: false
